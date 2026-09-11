@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -202,9 +203,22 @@
   }
   .recipe-card:active{ transform: scale(0.97); }
   .recipe-art{
-    height:96px; display:flex; align-items:center; justify-content:center; position:relative;
+    height:96px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
   }
-  .recipe-art svg{ width:44px; height:44px; stroke:#fff; fill:none; stroke-width:1.4; }
+  .recipe-art svg{ width:44px; height:44px; stroke:#fff; fill:none; stroke-width:1.4; position:relative; z-index:1; }
+  .recipe-art img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:2; background:inherit; }
+
+  /* "What do I have?" pantry matcher */
+  .pantry-cat{ font-size:12px; font-weight:800; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em; margin:16px 0 8px; }
+  .pantry-chip-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .pantry-chip{
+    padding:8px 12px; border-radius:999px; font-size:12.5px; font-weight:700;
+    background:var(--paper); border:1px solid var(--line); color:var(--ink-soft); cursor:pointer;
+  }
+  .pantry-chip.active{ background:var(--sage-deep); border-color:var(--sage-deep); color:#fff; }
+  .match-badge{ display:inline-block; font-size:10.5px; font-weight:800; padding:3px 9px; border-radius:999px; margin-top:5px; line-height:1.5; }
+  .match-full{ background:var(--sage-pale); color:var(--sage-deep); }
+  .match-partial{ background:var(--apricot-pale); color:var(--plum); }
   .recipe-body{ padding:11px 12px 13px; }
   .recipe-body .name{ font-weight:700; font-size:13.5px; line-height:1.25; margin-bottom:4px; }
   .recipe-body .kcal{ font-size:11.5px; color:var(--ink-soft); }
@@ -361,9 +375,31 @@
   <!-- ============ RECIPES ============ -->
   <div class="screen" id="screen-recipes" style="display:none;">
     <p class="eyebrow">Подобрано под её цель</p>
-    <h1 class="greeting" style="margin-bottom:16px;">Рецепты</h1>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:8px;">
+      <h1 class="greeting" style="margin-bottom:0;">Рецепты</h1>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <button class="btn btn-ghost" onclick="openPantrySheet()" style="padding:10px 14px; gap:6px;">
+          <svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v6M10 2v6M6 8a3 3 0 003 3v11M14 2v20M18 2c-2 1-2 3-2 5s0 4 2 5v10"/></svg>
+          <span>Что есть?</span>
+        </button>
+        <button class="btn btn-ghost" onclick="openShoppingList()" style="padding:10px 14px; gap:6px;">
+          <svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.5 3h2l2.6 12.4a2 2 0 002 1.6h8.8a2 2 0 002-1.6L21 8H6"/></svg>
+          <span id="shoplist-badge">Список</span>
+        </button>
+      </div>
+    </div>
     <div class="chip-row" id="recipe-filters"></div>
     <div class="recipe-grid" id="recipe-grid"></div>
+  </div>
+
+  <!-- ============ SHOPPING LIST ============ -->
+  <div class="sheet-backdrop" id="shoplist-sheet-backdrop" onclick="closeSheetOnBackdrop(event,'shoplist-sheet-backdrop')">
+    <div class="sheet" id="shoplist-sheet"></div>
+  </div>
+
+  <!-- ============ PANTRY MATCHER ("что есть дома?") ============ -->
+  <div class="sheet-backdrop" id="pantry-sheet-backdrop" onclick="closeSheetOnBackdrop(event,'pantry-sheet-backdrop')">
+    <div class="sheet" id="pantry-sheet"></div>
   </div>
 
   <!-- ============ DIARY ============ -->
@@ -488,39 +524,195 @@ const ICONS = {
   chicken: '<svg viewBox="0 0 24 24"><path d="M8 3a4 4 0 014 4c0 2-1 3-1 3l4 8H9l-2-6-2 2-2-2 3-3S6 7 6 6a3 3 0 012-3z"/></svg>',
   yogurt: '<svg viewBox="0 0 24 24"><path d="M9 3h6l1 4H8l1-4z"/><path d="M8 7h8l-1 13a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7z"/></svg>',
   soup: '<svg viewBox="0 0 24 24"><path d="M4 11h16v2a8 8 0 01-16 0v-2z"/><path d="M8 11V7M16 11V7M12 11V5"/></svg>',
-  smoothie: '<svg viewBox="0 0 24 24"><path d="M8 3h8l-1 6v9a3 3 0 01-6 0V9L8 3z"/><path d="M7.5 3h9"/></svg>'
+  smoothie: '<svg viewBox="0 0 24 24"><path d="M8 3h8l-1 6v9a3 3 0 01-6 0V9L8 3z"/><path d="M7.5 3h9"/></svg>',
+  cake: '<svg viewBox="0 0 24 24"><path d="M4 21v-7a4 4 0 014-4h8a4 4 0 014 4v7"/><path d="M4 13h16"/><path d="M9 9V6a3 3 0 016 0v3"/></svg>'
 };
 const ART_COLORS = ['#7E9473','#E28A4D','#9C6B5A','#6E8FA3','#B5895B','#849C6F'];
 function artStyle(i){ return `background:${ART_COLORS[i % ART_COLORS.length]};`; }
 
 /* ---------------------------------------------------------------
-   RECIPE DATA — kbju per serving
+   INGREDIENT CATALOG — used by the "what do I have?" matcher.
+   Every tag id used in RECIPES.tags must exist here.
+---------------------------------------------------------------- */
+const INGREDIENT_CATALOG = {
+  'Молочное и яйца': [
+    {id:'tvorog', label:'Творог'}, {id:'eggs', label:'Яйца'}, {id:'milk_or_water', label:'Молоко'},
+    {id:'kefir', label:'Кефир'}, {id:'yogurt_greek', label:'Греческий йогурт'}, {id:'cheese_light', label:'Сыр лёгкий'},
+  ],
+  'Крупы и бобовые': [
+    {id:'oats', label:'Овсяные хлопья'}, {id:'oat_flour', label:'Овсяная мука'}, {id:'buckwheat', label:'Гречка'},
+    {id:'rice', label:'Рис'}, {id:'brown_rice', label:'Бурый рис'}, {id:'barley', label:'Перловая крупа'},
+    {id:'quinoa', label:'Киноа'}, {id:'lentils', label:'Чечевица'}, {id:'chickpeas', label:'Нут'},
+    {id:'beans', label:'Фасоль'}, {id:'semolina', label:'Манная крупа'}, {id:'granola', label:'Гранола'},
+  ],
+  'Белок (мясо, рыба)': [
+    {id:'chicken_breast', label:'Курица (филе/фарш)'}, {id:'turkey_fillet', label:'Филе индейки'},
+    {id:'fish_fillet', label:'Рыба (треска/хек/лосось)'}, {id:'tuna_canned', label:'Тунец консервированный'},
+    {id:'kurt', label:'Курт'}, {id:'protein_powder', label:'Протеин (порошок)'},
+  ],
+  'Овощи и зелень': [
+    {id:'spinach', label:'Шпинат'}, {id:'tomato', label:'Помидоры'}, {id:'broccoli', label:'Брокколи'},
+    {id:'zucchini', label:'Цукини'}, {id:'carrot', label:'Морковь'}, {id:'cucumber', label:'Огурец'},
+    {id:'lettuce', label:'Листья салата'}, {id:'onion', label:'Лук'}, {id:'garlic', label:'Чеснок'},
+    {id:'cabbage', label:'Капуста'}, {id:'beet', label:'Свёкла'}, {id:'mushrooms', label:'Грибы'},
+    {id:'sweet_potato', label:'Батат'}, {id:'avocado', label:'Авокадо'}, {id:'dill', label:'Укроп'},
+  ],
+  'Фрукты и ягоды': [
+    {id:'berries', label:'Ягоды'}, {id:'banana', label:'Банан'}, {id:'lemon', label:'Лимон'},
+    {id:'apple', label:'Яблоко'}, {id:'dried_fruit', label:'Сухофрукты'},
+  ],
+  'Прочее': [
+    {id:'honey', label:'Мёд'}, {id:'olive_oil', label:'Растительное масло'}, {id:'walnuts', label:'Орехи'},
+    {id:'cinnamon', label:'Корица'}, {id:'chia_seeds', label:'Семена чиа'}, {id:'peanut_butter', label:'Арахисовая паста'},
+    {id:'baking_powder', label:'Разрыхлитель'}, {id:'cocoa', label:'Какао'}, {id:'almond_milk', label:'Миндальное молоко'},
+    {id:'veg_broth', label:'Овощной бульон'}, {id:'rosemary', label:'Розмарин'}, {id:'spices', label:'Специи'},
+    {id:'pita_wholegrain', label:'Лаваш цельнозерновой'}, {id:'yogurt_sauce', label:'Йогуртовый соус'},
+    {id:'shawarma_spice', label:'Специи для шаурмы'},
+  ],
+};
+const TAG_LABELS = {};
+Object.values(INGREDIENT_CATALOG).forEach(list => list.forEach(it => { TAG_LABELS[it.id] = it.label; }));
+
+/* ---------------------------------------------------------------
+   RECIPE DATA — kbju per serving.
+   `img` is a placeholder food photo (loose keyword match, auto-fetched
+   — swap for real photos any time by editing this field, see notes below).
+   `tags` are ingredient ids from INGREDIENT_CATALOG, used by the
+   "what do I have?" matcher.
 ---------------------------------------------------------------- */
 const RECIPES = [
   { id:1, name:'Овсянка с ягодами и творогом', cat:'Завтрак', icon:'bowl', kcal:320, p:24, f:8, c:38,
+    img:'https://loremflickr.com/480/360/oatmeal,berries',
+    tags:['oats','tvorog','berries','honey'],
     ingredients:['Овсяные хлопья — 50 г','Творог 5% — 100 г','Ягоды свежие/замороженные — 80 г','Мёд — 1 ч.л.','Вода/молоко — 150 мл'],
     steps:['Залейте овсяные хлопья горячей водой или молоком, оставьте на 5 минут под крышкой.','Добавьте творог, перемешайте до однородности.','Сверху выложите ягоды, полейте мёдом.','Подавайте тёплым.'] },
   { id:2, name:'Омлет с овощами и шпинатом', cat:'Завтрак', icon:'egg', kcal:280, p:22, f:17, c:8,
+    img:'https://loremflickr.com/480/360/omelette,spinach',
+    tags:['eggs','spinach','tomato','cheese_light','olive_oil'],
     ingredients:['Яйца — 2 шт','Шпинат — 40 г','Помидоры черри — 5 шт','Сыр лёгкий — 20 г','Оливковое масло — 1 ч.л.'],
     steps:['Разогрейте масло на сковороде, обжарьте шпинат 1 минуту.','Добавьте нарезанные томаты, готовьте ещё минуту.','Взбейте яйца, влейте на сковороду.','Готовьте под крышкой на слабом огне 4–5 минут, посыпьте сыром перед подачей.'] },
   { id:3, name:'Куриная грудка с киноа и брокколи', cat:'Обед', icon:'chicken', kcal:420, p:42, f:10, c:38,
-    ingredients:['Куриная грудка — 150 г','Киноа — 60 г (сухой вес)','Брокколи — 150 г','Чеснок — 1 зубчик','Оливковое масло — 1 ч.л.','Специи по вкусу'],
+    img:'https://loremflickr.com/480/360/chicken,broccoli',
+    tags:['chicken_breast','quinoa','broccoli','garlic','olive_oil','spices'],
+    ingredients:['Куриная грудка — 150 г','Киноа — 60 г, сухой вес (можно заменить бурым рисом или гречкой)','Брокколи — 150 г','Чеснок — 1 зубчик','Оливковое масло — 1 ч.л.','Специи по вкусу'],
     steps:['Отварите киноа в подсоленной воде 12–15 минут.','Куриную грудку натрите специями, обжарьте на среднем огне по 5–6 минут с каждой стороны.','Брокколи отварите на пару 4–5 минут.','Соберите тарелку: киноа, курица, брокколи, сбрызните маслом.'] },
-  { id:4, name:'Лосось на пару с овощами', cat:'Ужин', icon:'fish', kcal:390, p:34, f:22, c:12,
-    ingredients:['Филе лосося — 150 г','Цукини — 100 г','Морковь — 80 г','Лимон — 2 дольки','Укроп, соль, перец'],
+  { id:4, name:'Рыба на пару с овощами', cat:'Ужин', icon:'fish', kcal:390, p:34, f:22, c:12,
+    img:'https://loremflickr.com/480/360/fish,steamed,vegetables',
+    tags:['fish_fillet','zucchini','carrot','lemon','dill'],
+    ingredients:['Филе хека или трески — 150 г (лосось — по возможности)','Цукини — 100 г','Морковь — 80 г','Лимон — 2 дольки','Укроп, соль, перец'],
     steps:['Выложите рыбу и нарезанные овощи в пароварку.','Готовьте на пару 12–15 минут.','Сбрызните лимонным соком, посыпьте укропом.','Подавайте сразу.'] },
   { id:5, name:'Салат с тунцом и фасолью', cat:'Обед', icon:'leaf', kcal:340, p:28, f:14, c:26,
+    img:'https://loremflickr.com/480/360/tuna,salad',
+    tags:['tuna_canned','beans','cucumber','lettuce','olive_oil','lemon'],
     ingredients:['Тунец в собственном соку — 100 г','Фасоль отварная — 100 г','Огурец — 1 шт','Листья салата — 50 г','Оливковое масло — 1 ч.л.','Лимонный сок'],
     steps:['Смешайте нарезанные овощи и листья салата в миске.','Добавьте тунец и фасоль.','Заправьте маслом и лимонным соком, перемешайте.'] },
   { id:6, name:'Греческий йогурт с орехами и мёдом', cat:'Перекус', icon:'yogurt', kcal:210, p:15, f:9, c:18,
+    img:'https://loremflickr.com/480/360/yogurt,honey,walnuts',
+    tags:['yogurt_greek','walnuts','honey','cinnamon'],
     ingredients:['Греческий йогурт 2% — 150 г','Грецкие орехи — 10 г','Мёд — 1 ч.л.','Корица — щепотка'],
     steps:['Выложите йогурт в пиалу.','Посыпьте измельчёнными орехами и корицей.','Полейте мёдом.'] },
   { id:7, name:'Овощной суп с чечевицей', cat:'Ужин', icon:'soup', kcal:260, p:16, f:5, c:38,
+    img:'https://loremflickr.com/480/360/lentil,soup',
+    tags:['lentils','carrot','onion','tomato','veg_broth','spices'],
     ingredients:['Чечевица красная — 60 г','Морковь — 1 шт','Лук — 1 шт','Томаты — 2 шт','Овощной бульон — 500 мл','Специи по вкусу'],
     steps:['Обжарьте лук и морковь до мягкости.','Добавьте томаты и бульон, доведите до кипения.','Всыпьте чечевицу, варите 15–18 минут до готовности.','Приправьте по вкусу и подавайте горячим.'] },
   { id:8, name:'Смузи со шпинатом и бананом', cat:'Перекус', icon:'smoothie', kcal:190, p:8, f:3, c:33,
+    img:'https://loremflickr.com/480/360/smoothie,banana,spinach',
+    tags:['banana','spinach','kefir','chia_seeds'],
     ingredients:['Банан — 1 шт','Шпинат — 30 г','Кефир 1% — 200 мл','Семена чиа — 1 ч.л.'],
     steps:['Сложите все ингредиенты в блендер.','Взбейте до однородности 30–40 секунд.','Перелейте в стакан и подавайте сразу.'] },
+  { id:9, name:'Протеиновые панкейки с бананом', cat:'Завтрак', icon:'cake', kcal:310, p:24, f:8, c:36,
+    img:'https://loremflickr.com/480/360/pancakes,banana',
+    tags:['oats','banana','eggs','tvorog','baking_powder'],
+    ingredients:['Овсяные хлопья — 40 г','Банан — 1 шт','Яйцо — 1 шт','Творог 5% — 50 г','Разрыхлитель — 0.5 ч.л.'],
+    steps:['Измельчите овсяные хлопья в блендере до состояния муки.','Добавьте банан, яйцо, творог и разрыхлитель, взбейте до однородности.','Жарьте панкейки на сухой антипригарной сковороде по 1–2 минуты с каждой стороны.','Подавайте с ягодами или мёдом по желанию.'] },
+  { id:10, name:'Творожный боул с арахисовой пастой', cat:'Завтрак', icon:'yogurt', kcal:380, p:28, f:16, c:30,
+    img:'https://loremflickr.com/480/360/cottagecheese,peanutbutter',
+    tags:['tvorog','peanut_butter','berries','granola'],
+    ingredients:['Творог 2% — 150 г','Арахисовая паста — 15 г','Ягоды свежие/замороженные — 60 г','Гранола — 20 г'],
+    steps:['Выложите творог в глубокую тарелку, слегка разровняйте.','Сверху выложите ягоды и гранолу.','Полейте арахисовой пастой (можно слегка растопить для красивого узора).'] },
+  { id:11, name:'Ролл с тунцом в лаваше', cat:'Обед', icon:'leaf', kcal:340, p:30, f:8, c:34,
+    img:'https://loremflickr.com/480/360/tuna,wrap',
+    tags:['pita_wholegrain','tuna_canned','yogurt_greek','cucumber','lettuce'],
+    ingredients:['Лаваш цельнозерновой — 1 шт (подойдёт и обычный тонкий лаваш)','Тунец в собственном соку — 100 г','Греческий йогурт — 30 г','Огурец — 0.5 шт','Листья салата — 30 г'],
+    steps:['Смешайте тунец с греческим йогуртом.','Выложите начинку на лаваш, добавьте нарезанный огурец и листья салата.','Плотно сверните в рулет и разрежьте пополам.'] },
+  { id:12, name:'Боул с нутом и авокадо', cat:'Обед', icon:'leaf', kcal:430, p:16, f:16, c:56,
+    img:'https://loremflickr.com/480/360/chickpea,avocado,bowl',
+    tags:['chickpeas','quinoa','avocado','carrot','spinach','lemon'],
+    ingredients:['Нут отварной — 120 г (можно заменить консервированной фасолью)','Киноа — 50 г, сухой вес (можно заменить рисом или гречкой)','Авокадо — 0.5 шт','Морковь — 1 шт','Шпинат — 40 г','Лимонный сок — по вкусу'],
+    steps:['Отварите киноа согласно инструкции на упаковке.','Морковь натрите или нарежьте тонкими лентами.','Соберите боул: киноа, нут, авокадо, морковь и шпинат.','Сбрызните лимонным соком перед подачей.'] },
+  { id:13, name:'Боул с курицей в стиле шаурмы', cat:'Ужин', icon:'chicken', kcal:460, p:40, f:10, c:48,
+    img:'https://loremflickr.com/480/360/chicken,rice,bowl',
+    tags:['chicken_breast','brown_rice','cucumber','tomato','yogurt_sauce','shawarma_spice'],
+    ingredients:['Куриное филе — 150 г','Рис бурый — 50 г (сухой вес)','Огурец — 1 шт','Помидор — 1 шт','Йогуртовый соус — 30 г','Специи для шаурмы — 1 ч.л.'],
+    steps:['Куриное филе натрите специями и обжарьте или запеките до готовности.','Отварите бурый рис согласно инструкции.','Нарежьте огурец и помидор кубиками.','Соберите боул из риса, курицы и овощей, полейте йогуртовым соусом.'] },
+  { id:14, name:'Овсянка на ночь с протеином', cat:'Завтрак', icon:'bowl', kcal:320, p:26, f:7, c:38,
+    img:'https://loremflickr.com/480/360/overnightoats,berries',
+    tags:['oats','protein_powder','almond_milk','chia_seeds','berries'],
+    ingredients:['Овсяные хлопья — 50 г','Протеин ванильный — 20 г','Молоко миндальное — 150 мл (подойдёт обычное молоко)','Семена чиа — 1 ч.л.','Ягоды свежие/замороженные — 50 г'],
+    steps:['Смешайте овсяные хлопья, протеин, молоко и семена чиа в банке или контейнере.','Перемешайте и уберите в холодильник минимум на 4 часа или на ночь.','Перед подачей выложите сверху ягоды.'] },
+  { id:15, name:'Протеиновый "нис-крим" из банана', cat:'Перекус', icon:'smoothie', kcal:210, p:16, f:4, c:30,
+    img:'https://loremflickr.com/480/360/banana,icecream',
+    tags:['banana','protein_powder','almond_milk','cocoa'],
+    ingredients:['Банан замороженный — 1 шт','Протеин ванильный — 15 г','Молоко миндальное — 50 мл (подойдёт обычное молоко)','Какао-крупка — 5 г'],
+    steps:['Заранее заморозьте нарезанный кружочками банан (минимум 3 часа).','Взбейте банан, протеин и молоко в блендере до текстуры мороженого.','Переложите в креманку и посыпьте какао-крупкой.'] },
+  { id:16, name:'Protein mug cake за 2 минуты', cat:'Перекус', icon:'cake', kcal:240, p:22, f:6, c:24,
+    img:'https://loremflickr.com/480/360/mugcake,chocolate',
+    tags:['protein_powder','eggs','banana','baking_powder','milk_or_water'],
+    ingredients:['Протеин шоколадный — 30 г','Яйцо — 1 шт','Банан — 0.5 шт','Разрыхлитель — 0.25 ч.л.','Молоко — 30 мл'],
+    steps:['Разомните банан вилкой в кружке, добавьте яйцо и молоко, размешайте.','Всыпьте протеин и разрыхлитель, тщательно перемешайте до однородности без комков.','Поставьте кружку в микроволновку на 90 секунд на полной мощности.','Дайте немного остыть перед тем, как есть — коржик продолжает готовиться пару секунд после выключения.'] },
+  { id:17, name:'Индейка, запечённая с бататом', cat:'Ужин', icon:'chicken', kcal:380, p:38, f:9, c:34,
+    img:'https://loremflickr.com/480/360/turkey,sweetpotato',
+    tags:['turkey_fillet','sweet_potato','olive_oil','rosemary'],
+    ingredients:['Филе индейки — 150 г','Батат — 150 г','Оливковое масло — 1 ч.л.','Розмарин — по вкусу','Соль, перец — по вкусу'],
+    steps:['Разогрейте духовку до 200°C.','Батат нарежьте дольками, филе индейки — крупными кусками.','Смешайте с маслом и специями, выложите на противень.','Запекайте 25–30 минут до готовности, один раз перемешав.'] },
+  { id:18, name:'Протеиновые маффины с какао', cat:'Перекус', icon:'cake', kcal:260, p:18, f:6, c:30,
+    img:'https://loremflickr.com/480/360/muffins,chocolate,banana',
+    tags:['oat_flour','banana','eggs','protein_powder','cocoa','baking_powder'],
+    ingredients:['Овсяная мука — 60 г','Банан — 1 шт','Яйцо — 1 шт','Протеин шоколадный — 30 г','Какао — 1 ст.л.','Разрыхлитель — 1 ч.л.'],
+    steps:['Разомните банан, смешайте с яйцом.','Добавьте овсяную муку, протеин, какао и разрыхлитель, замесите тесто.','Разложите по формам для маффинов (получится 4 шт).','Выпекайте при 180°C около 18–20 минут. Порция — 2 маффина.'] },
+
+  /* ---- Добавлено: простые ПП-рецепты на казахстанских продуктах ---- */
+  { id:19, name:'Гречка с курицей и овощами', cat:'Обед', icon:'chicken', kcal:400, p:35, f:10, c:40,
+    img:'https://loremflickr.com/480/360/buckwheat,chicken',
+    tags:['buckwheat','chicken_breast','carrot','onion','olive_oil','spices'],
+    ingredients:['Гречка — 60 г (сухой вес)','Куриное филе — 130 г','Морковь — 1 шт','Лук — 0.5 шт','Растительное масло — 1 ч.л.','Специи по вкусу'],
+    steps:['Отварите гречку в подсоленной воде 15 минут.','Куриное филе нарежьте кубиками, обжарьте с луком и морковью 8–10 минут.','Смешайте с гречкой, приправьте по вкусу.'] },
+  { id:20, name:'Творожная запеканка с яблоком', cat:'Завтрак', icon:'bowl', kcal:330, p:26, f:10, c:34,
+    img:'https://loremflickr.com/480/360/cottagecheese,casserole,apple',
+    tags:['tvorog','eggs','semolina','apple','honey'],
+    ingredients:['Творог 5% — 200 г','Яйцо — 1 шт','Манная крупа — 2 ст.л.','Яблоко — 1 шт','Мёд — 1 ч.л.'],
+    steps:['Смешайте творог, яйцо и манную крупу до однородности.','Яблоко нарежьте небольшими кубиками, добавьте в массу.','Выложите в форму для запекания, разровняйте.','Выпекайте при 180°C 25–30 минут до румяной корочки.'] },
+  { id:21, name:'Куриные котлеты на пару с гречкой', cat:'Ужин', icon:'chicken', kcal:380, p:38, f:9, c:34,
+    img:'https://loremflickr.com/480/360/chicken,cutlets,steamed',
+    tags:['chicken_breast','onion','eggs','buckwheat'],
+    ingredients:['Фарш куриный — 150 г','Лук — 0.5 шт','Яйцо — 1 шт','Гречка — 50 г (сухой вес)'],
+    steps:['Смешайте фарш с мелко нарезанным луком и яйцом, посолите.','Сформируйте котлеты, готовьте на пару 20 минут.','Отдельно отварите гречку и подавайте вместе.'] },
+  { id:22, name:'Рыбные котлеты из трески с рисом', cat:'Ужин', icon:'fish', kcal:360, p:32, f:8, c:38,
+    img:'https://loremflickr.com/480/360/fishcakes,rice',
+    tags:['fish_fillet','eggs','onion','rice','carrot'],
+    ingredients:['Филе трески или хека — 200 г','Лук — 0.5 шт','Яйцо — 1 шт','Рис — 50 г (сухой вес)','Морковь — 1 шт'],
+    steps:['Измельчите рыбу в фарш блендером, добавьте лук и яйцо, посолите.','Сформируйте котлеты, готовьте на пару или на сухой сковороде 15 минут.','Отварите рис с морковью и подавайте вместе.'] },
+  { id:23, name:'Салат «Щётка»', cat:'Перекус', icon:'leaf', kcal:150, p:3, f:5, c:24,
+    img:'https://loremflickr.com/480/360/cabbage,carrot,beetroot,salad',
+    tags:['cabbage','carrot','beet','apple','olive_oil','lemon'],
+    ingredients:['Капуста белокочанная — 150 г','Морковь — 1 шт','Свёкла сырая — 1 шт','Яблоко — 1 шт','Растительное масло — 1 ч.л.','Лимонный сок — по вкусу'],
+    steps:['Нашинкуйте капусту тонкой соломкой.','Морковь, свёклу и яблоко натрите на крупной тёрке.','Перемешайте всё вместе, заправьте маслом и лимонным соком.'] },
+  { id:24, name:'Плов с курицей на буром рисе', cat:'Обед', icon:'bowl', kcal:430, p:35, f:8, c:52,
+    img:'https://loremflickr.com/480/360/pilaf,rice,chicken',
+    tags:['chicken_breast','brown_rice','carrot','onion','garlic','spices'],
+    ingredients:['Куриное филе — 150 г','Рис бурый — 60 г (сухой вес)','Морковь — 1 шт','Лук — 1 шт','Чеснок — 2 зубчика','Специи для плова — 1 ч.л.'],
+    steps:['Обжарьте лук и морковь до мягкости.','Добавьте нарезанную курицу, готовьте 5 минут.','Всыпьте рис и специи, залейте водой на 1.5 см выше риса.','Тушите под крышкой на слабом огне 25–30 минут до готовности риса.'] },
+  { id:25, name:'Курт с орехами и сухофруктами', cat:'Перекус', icon:'yogurt', kcal:180, p:9, f:10, c:14,
+    img:'https://loremflickr.com/480/360/driedfruit,nuts,snack',
+    tags:['kurt','walnuts','dried_fruit'],
+    ingredients:['Курт — 30 г','Грецкие орехи — 10 г','Курага или чернослив — 20 г'],
+    steps:['Готовка не нужна — выложите всё на тарелку. Готовый перекус, который удобно взять с собой.'] },
+  { id:26, name:'Перловая каша с грибами и курицей', cat:'Ужин', icon:'bowl', kcal:380, p:32, f:7, c:48,
+    img:'https://loremflickr.com/480/360/barley,mushroom,chicken',
+    tags:['barley','mushrooms','chicken_breast','onion'],
+    ingredients:['Перловая крупа — 60 г (сухой вес, лучше замочить заранее)','Грибы шампиньоны — 100 г','Куриное филе — 100 г','Лук — 0.5 шт'],
+    steps:['Отварите перловку 30–40 минут до мягкости.','Обжарьте лук с грибами 5 минут, добавьте нарезанную курицу, готовьте ещё 8 минут.','Смешайте с перловкой и подавайте горячим.'] },
 ];
 
 /* ---------------------------------------------------------------
@@ -567,6 +759,9 @@ let workoutState = {}; // dayIndex -> array of booleans per exercise
 let notifTimers = [];
 let notifEnabled = false;
 let activeFilter = 'Все';
+let shoppingList = { selectedRecipeIds:[], items:[] };
+let shopPickerVisible = true;
+let pantry = []; // array of ingredient tag ids the user says she has
 
 /* ---------------------------------------------------------------
    PERSISTENCE — localStorage, so data survives closing the app.
@@ -578,7 +773,7 @@ function todayKey(){ return new Date().toISOString().slice(0,10); }
 function saveState(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      schemaVersion: 1, profile, meals, mealsDate, workoutState, notifEnabled
+      schemaVersion: 1, profile, meals, mealsDate, workoutState, notifEnabled, shoppingList, pantry
     }));
   } catch(e){ /* storage unavailable — app still works, just won't persist */ }
 }
@@ -596,7 +791,11 @@ function loadState(){
     if(data.workoutState && typeof data.workoutState === 'object'){
       workoutState = Object.assign({}, workoutState, data.workoutState);
     }
+    if(data.shoppingList && typeof data.shoppingList === 'object'){
+      shoppingList = Object.assign({selectedRecipeIds:[], items:[]}, data.shoppingList);
+    }
     if(typeof data.notifEnabled === 'boolean') notifEnabled = data.notifEnabled;
+    if(Array.isArray(data.pantry)) pantry = data.pantry;
     // reset the food diary each new day, keep history of settings/profile/workouts
     if(data.mealsDate === todayKey() && Array.isArray(data.meals)){
       meals = data.meals;
@@ -740,7 +939,10 @@ function renderRecipeGrid(){
   const items = RECIPES.filter(r => activeFilter==='Все' || r.cat===activeFilter);
   document.getElementById('recipe-grid').innerHTML = items.map((r,i) => `
     <div class="recipe-card" onclick="openRecipe(${r.id})">
-      <div class="recipe-art" style="${artStyle(i)}">${ICONS[r.icon]}</div>
+      <div class="recipe-art" style="${artStyle(i)}">
+        ${ICONS[r.icon]}
+        ${r.img ? `<img src="${r.img}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+      </div>
       <div class="recipe-body">
         <div class="name">${r.name}</div>
         <div class="kcal">${r.kcal} ккал · Б${r.p}/Ж${r.f}/У${r.c}</div>
@@ -751,7 +953,10 @@ function openRecipe(id){
   const r = RECIPES.find(x=>x.id===id);
   document.getElementById('recipe-sheet').innerHTML = `
     <div class="sheet-handle"></div>
-    <div class="recipe-art" style="height:120px;border-radius:16px;${artStyle(id)}">${ICONS[r.icon]}</div>
+    <div class="recipe-art" style="height:120px;border-radius:16px;${artStyle(id)}">
+      ${ICONS[r.icon]}
+      ${r.img ? `<img src="${r.img}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+    </div>
     <h2 style="margin-top:14px;">${r.name}</h2>
     <div class="kcal-line">${r.cat} · ${r.kcal} ккал на порцию</div>
     <div class="kbju-grid">
@@ -779,6 +984,191 @@ function addRecipeToDiary(id){
   closeSheet('recipe-sheet-backdrop');
   renderHome();
   showToast('Добавлено в дневник: ' + r.name);
+}
+
+/* ---------------------------------------------------------------
+   PANTRY MATCHER — "что есть дома?" -> ранжированные рецепты
+---------------------------------------------------------------- */
+function matchRecipes(selectedIds){
+  return RECIPES
+    .map(r => {
+      const matched = r.tags.filter(t => selectedIds.includes(t));
+      return { recipe:r, matched: matched.length, total: r.tags.length, missing: r.tags.filter(t => !selectedIds.includes(t)) };
+    })
+    .filter(x => x.matched > 0)
+    .sort((a,b) => (b.matched/b.total) - (a.matched/a.total) || b.matched - a.matched);
+}
+function openPantrySheet(){
+  renderPantrySheet();
+  document.getElementById('pantry-sheet-backdrop').classList.add('open');
+}
+function togglePantryItem(id){
+  const idx = pantry.indexOf(id);
+  if(idx>-1) pantry.splice(idx,1); else pantry.push(id);
+  saveState();
+  renderPantrySheet();
+}
+function clearPantry(){
+  pantry = [];
+  saveState();
+  renderPantrySheet();
+}
+function renderPantrySheet(){
+  const catsHTML = Object.entries(INGREDIENT_CATALOG).map(([cat, items]) => `
+    <div class="pantry-cat">${cat}</div>
+    <div class="pantry-chip-grid">
+      ${items.map(it => `<button class="pantry-chip ${pantry.includes(it.id)?'active':''}" onclick="togglePantryItem('${it.id}')">${it.label}</button>`).join('')}
+    </div>
+  `).join('');
+
+  let resultsHTML = '';
+  if(pantry.length){
+    const results = matchRecipes(pantry);
+    resultsHTML = results.length ? `
+      <div class="section-head" style="margin:22px 0 10px;"><h2 style="font-size:15px;">Можно приготовить</h2></div>
+      ${results.map(({recipe:r, missing}) => `
+        <div class="meal-card" style="cursor:pointer; align-items:flex-start;" onclick="closeSheet('pantry-sheet-backdrop'); openRecipe(${r.id});">
+          <div class="meal-icon">${ICONS[r.icon]}</div>
+          <div class="meal-info">
+            <div class="name">${r.name}</div>
+            <div class="meta">${r.cat} · ${r.kcal} ккал</div>
+            <span class="match-badge ${missing.length===0 ? 'match-full' : 'match-partial'}">
+              ${missing.length===0 ? 'Все продукты есть ✓' : 'Не хватает: ' + missing.map(t=>TAG_LABELS[t]).join(', ')}
+            </span>
+          </div>
+        </div>`).join('')}
+    ` : `
+      <div class="empty-state" style="margin-top:20px;">
+        <p><strong>Пока нет совпадений.</strong></p>
+        <p>Отметьте больше продуктов — здесь появятся подходящие рецепты.</p>
+      </div>`;
+  }
+
+  document.getElementById('pantry-sheet').innerHTML = `
+    <div class="sheet-handle"></div>
+    <h2>Что есть дома?</h2>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 6px;">Отметьте продукты, которые есть в холодильнике — покажем рецепты, которые из них можно приготовить.</p>
+    ${pantry.length ? `<a style="font-size:12.5px;color:var(--sage-deep);font-weight:700;cursor:pointer;" onclick="clearPantry()">Сбросить выбор (${pantry.length})</a>` : ''}
+    <div style="margin-top:12px;">${catsHTML}</div>
+    ${resultsHTML}
+  `;
+}
+
+/* ---------------------------------------------------------------
+   SHOPPING LIST — pick recipes, ingredients merge into one checklist
+---------------------------------------------------------------- */
+function parseQty(str){
+  if(!str) return { num:null, unit:'' };
+  const m = str.trim().match(/^([\d.,]+)\s*(.*)$/);
+  if(m) return { num: parseFloat(m[1].replace(',', '.')), unit: m[2].trim() };
+  return { num:null, unit: str.trim() };
+}
+function combineQty(a, b){
+  if(!a) return b;
+  if(!b) return a;
+  const pa = parseQty(a), pb = parseQty(b);
+  if(pa.num!=null && pb.num!=null && pa.unit===pb.unit){
+    const sum = Math.round((pa.num+pb.num)*100)/100;
+    return sum + (pa.unit ? ' '+pa.unit : '');
+  }
+  return a + ' + ' + b;
+}
+function updateShopBadge(){
+  const el = document.getElementById('shoplist-badge');
+  if(!el) return;
+  const left = shoppingList.items.filter(i=>!i.checked).length;
+  el.textContent = left>0 ? `Список (${left})` : 'Список';
+}
+function openShoppingList(){
+  shopPickerVisible = shoppingList.items.length === 0;
+  renderShoppingListSheet();
+  document.getElementById('shoplist-sheet-backdrop').classList.add('open');
+}
+function toggleShopPicker(){ shopPickerVisible = !shopPickerVisible; renderShoppingListSheet(); }
+function toggleShopRecipe(id){
+  const idx = shoppingList.selectedRecipeIds.indexOf(id);
+  if(idx>-1) shoppingList.selectedRecipeIds.splice(idx,1); else shoppingList.selectedRecipeIds.push(id);
+  saveState();
+  renderShoppingListSheet();
+}
+function generateShoppingList(){
+  if(shoppingList.selectedRecipeIds.length === 0){ showToast('Выберите хотя бы один рецепт'); return; }
+  const prevChecked = {};
+  shoppingList.items.forEach(it => prevChecked[it.name.toLowerCase()] = it.checked);
+  const map = {};
+  shoppingList.selectedRecipeIds.forEach(id=>{
+    const r = RECIPES.find(x=>x.id===id);
+    if(!r) return;
+    r.ingredients.forEach(ingStr=>{
+      const parts = ingStr.split(' — ');
+      const name = parts[0].trim();
+      const qtyStr = (parts[1]||'').trim();
+      const key = name.toLowerCase();
+      map[key] = map[key]
+        ? { name, qty: combineQty(map[key].qty, qtyStr) }
+        : { name, qty: qtyStr };
+    });
+  });
+  shoppingList.items = Object.values(map).map(it => ({ ...it, checked: prevChecked[it.name.toLowerCase()] || false }));
+  shopPickerVisible = false;
+  saveState();
+  renderShoppingListSheet();
+  showToast('Список составлен');
+}
+function toggleShopItem(i){
+  shoppingList.items[i].checked = !shoppingList.items[i].checked;
+  saveState();
+  renderShoppingListSheet();
+}
+function clearShoppingList(){
+  shoppingList = { selectedRecipeIds:[], items:[] };
+  shopPickerVisible = true;
+  saveState();
+  renderShoppingListSheet();
+}
+function renderShoppingListSheet(){
+  const selected = shoppingList.selectedRecipeIds;
+  const pickerHTML = shopPickerVisible ? `
+    <h4>Выберите рецепты</h4>
+    ${RECIPES.map(r=>`
+      <label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;cursor:pointer;">
+        <input type="checkbox" style="width:18px;height:18px;flex-shrink:0;" ${selected.includes(r.id)?'checked':''} onchange="toggleShopRecipe(${r.id})">
+        <span style="flex:1;">${r.name}</span>
+        <span style="color:var(--ink-soft);font-size:12px;">${r.kcal} ккал</span>
+      </label>`).join('')}
+    <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="generateShoppingList()">Составить список (${selected.length})</button>
+  ` : `
+    <button class="btn btn-outline btn-block" onclick="toggleShopPicker()">Изменить рецепты (${selected.length})</button>
+  `;
+
+  const left = shoppingList.items.filter(i=>!i.checked).length;
+  const listHTML = shoppingList.items.length ? `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px;">
+      <h4 style="margin:0;">Список покупок · осталось ${left}</h4>
+      <a style="font-size:12.5px;color:var(--sage-deep);font-weight:700;cursor:pointer;" onclick="clearShoppingList()">Очистить всё</a>
+    </div>
+    <ul class="ing-list">
+      ${shoppingList.items.map((it,i)=>`
+        <li style="cursor:pointer;" onclick="toggleShopItem(${i})">
+          <span style="display:flex;align-items:center;gap:10px;${it.checked?'text-decoration:line-through;color:var(--ink-soft);':''}">
+            <span class="ex-check ${it.checked?'done':''}" style="width:20px;height:20px;">
+              <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+            ${it.name}
+          </span>
+          <span>${it.qty}</span>
+        </li>`).join('')}
+    </ul>
+  ` : '';
+
+  document.getElementById('shoplist-sheet').innerHTML = `
+    <div class="sheet-handle"></div>
+    <h2>Список покупок</h2>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">Выберите рецепты — их ингредиенты объединятся в один список, одинаковые продукты сложатся вместе.</p>
+    ${pickerHTML}
+    ${listHTML}
+  `;
+  updateShopBadge();
 }
 
 /* ---------------------------------------------------------------
@@ -1021,6 +1411,7 @@ renderWorkoutBody();
 renderProfile();
 renderHome();
 renderDiary();
+updateShopBadge();
 const notifToggleEl = document.getElementById('notif-toggle');
 if(notifEnabled){
   notifToggleEl.checked = true;
